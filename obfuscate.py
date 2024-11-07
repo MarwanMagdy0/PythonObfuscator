@@ -132,11 +132,11 @@ def obfuscate_code(file_path):
     obfuscated_code = astor.to_source(obfuscated_tree, add_line_information=True)
     return obfuscated_code
 
-# Example usage:
-file_path = "merged_output.py"  # Input Python file you want to obfuscate
-obfuscated_code = obfuscate_code(file_path)
+if __name__ == "__main__":
+    file_path = "merged_output.py"  # Input Python file you want to obfuscate
+    obfuscated_code = obfuscate_code(file_path)
 
-# Write the obfuscated code to a new file
-with open("obfuscated_output.py", "w") as outfile:
-    outfile.write(obfuscated_code)
-print("Obfuscated code written to 'obfuscated_output.py'")
+    # Write the obfuscated code to a new file
+    with open("obfuscated_output.py", "w") as outfile:
+        outfile.write(obfuscated_code)
+    print("Obfuscated code written to 'obfuscated_output.py'")
