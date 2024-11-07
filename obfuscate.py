@@ -4,11 +4,12 @@ import string
 import astor
 random.seed(0)
 class ObfuscateMasters(ast.NodeTransformer):
-    def __init__(self):
+    def __init__(self, ignore_words=[]):
         super().__init__()
         self.name_map = {}
         self.imported_modules = set()
         self.is_comprehension = False
+        self.ignore_words = ignore_words
 
     def random_name(self, length=40):
         return ''.join(random.choices(string.ascii_letters, k=length))
@@ -18,6 +19,9 @@ class ObfuscateMasters(ast.NodeTransformer):
             return original_name
         
         if original_name in self.imported_modules:
+            return original_name
+        
+        if original_name in self.ignore_words:
             return original_name
         
         if original_name not in self.name_map:
@@ -44,11 +48,13 @@ class ObfuscateMasters(ast.NodeTransformer):
         return node
 
 class ObfuscateNames(ast.NodeTransformer):
-    def __init__(self, name_map, imported_modules):
+    def __init__(self, name_map, imported_modules, ignore_words=[]):
         super().__init__()
         self.name_map = name_map
         self.imported_modules = imported_modules
+        self.ignore_words = ignore_words
         self.is_comprehension = False
+        self.class_attrs = set()
 
     def random_name(self, length=40):
         return ''.join(random.choices(string.ascii_letters, k=length))
@@ -58,6 +64,9 @@ class ObfuscateNames(ast.NodeTransformer):
             return original_name
         
         if original_name in self.imported_modules:
+            return original_name
+        
+        if original_name in self.ignore_words:
             return original_name
         
         if original_name not in self.name_map:
@@ -84,11 +93,26 @@ class ObfuscateNames(ast.NodeTransformer):
         return node
     
     def visit_ClassDef(self, node):
+        # Reset class-specific attributes at the beginning of each class
+        self.class_attrs = set()
+        
+        # Collect all attributes and methods defined directly in this class
+        for item in node.body:
+            if isinstance(item, ast.FunctionDef):
+                self.class_attrs.add(item.name)
+            elif isinstance(item, ast.Assign):
+                for target in item.targets:
+                    if isinstance(target, ast.Name):
+                        self.class_attrs.add(target.id)
+
+        print(self.class_attrs)
 
         self.generic_visit(node)
         return node
 
     def visit_Name(self, node):
+        if node.id == "text":
+            print(node)
         if node.id in self.name_map:
             node.id = self.name_map[node.id]
         elif isinstance(node.ctx, (ast.Store)):
@@ -108,7 +132,10 @@ class ObfuscateNames(ast.NodeTransformer):
 
     def visit_Attribute(self, node):
         if isinstance(node.value, ast.Name) and node.attr in self.name_map:
-            node.attr = self.name_map[node.attr]
+            print(node.attr)
+            # if node.attr == "pressed":
+            if self.name_map[node.attr] in self.class_attrs:
+                node.attr = self.name_map[node.attr]
         return self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
