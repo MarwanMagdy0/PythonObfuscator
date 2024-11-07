@@ -15,7 +15,7 @@ def get_all_files_in_directory(root_dir):
     
     return all_files
 
-root_dir = "example"
+root_dir = "/media/marwan/01DA974290394900/Python_Projects/Qt/QPaint_HowToUse/omar"
 files = get_all_files_in_directory(root_dir)
 print(files)
 all_golobals = {}

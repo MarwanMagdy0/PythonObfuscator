@@ -107,7 +107,7 @@ class ObfuscateNames(ast.NodeTransformer):
         return node
 
     def visit_Attribute(self, node):
-        if node.attr in self.name_map:
+        if isinstance(node.value, ast.Name) and node.attr in self.name_map:
             node.attr = self.name_map[node.attr]
         return self.generic_visit(node)
 
