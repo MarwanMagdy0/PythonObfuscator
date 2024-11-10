@@ -2,6 +2,7 @@ import ast
 import random
 import string
 import astunparse
+import pprint
 
 import builtins
 random.seed(0)
@@ -14,12 +15,10 @@ def create_mapper(class_and_function_names: set, imported_modules: set, global_v
     for imported_module in imported_modules:
         if imported_module in class_and_function_names:
             mapper[imported_module] = random_name()
-            class_and_function_names.remove(imported_module)
+            imported_module.remove(imported_module)
         elif imported_module in global_variables:
             mapper[imported_module] = random_name()
-            global_variables.remove(imported_module)
-        else:
-            mapper[imported_module] = imported_module
+            imported_module.remove(imported_module)
     
     for class_and_function_name in class_and_function_names:
         mapper[class_and_function_name] = random_name()
@@ -83,18 +82,30 @@ class ObfuscateNames(ast.NodeTransformer):
 
     def visit_FunctionDef(self, node):
         print("\n*********visit function*********")
-        if node.name in self.mapper:
+        if node.name in self.mapper: # function name
             node.name = self.mapper[node.name]
+        
         for arg in node.args.args:
             print(arg.arg, "->", arg.lineno)
             if self.arguments.get(arg.arg) is None:
                 self.arguments[arg.arg] = random_name()
-                arg.arg = self.arguments[arg.arg]
+            arg.arg = self.arguments[arg.arg]
         
+        for arg in node.args.kwonlyargs:
+            print(arg.arg, "->", arg.lineno)
+            if self.arguments.get(arg.arg) is None:
+                self.arguments[arg.arg] = random_name()
+            arg.arg = self.arguments[arg.arg]
+
         if node.args.vararg:
-            print(node.args.vararg.arg)
+            if self.arguments.get(arg.arg) is None:
+                self.arguments[node.args.vararg.arg] = random_name()
+            node.args.vararg.arg = self.arguments[node.args.vararg.arg]
+        
         if node.args.kwarg:
-            print(node.args.kwarg.arg)
+            if self.arguments.get(arg.arg) is None:
+                self.arguments[node.args.kwarg.arg] = random_name()
+            node.args.kwarg.arg = self.arguments[node.args.kwarg.arg]
         self.generic_visit(node)
         return node
     
@@ -150,10 +161,19 @@ class ObfuscateNames(ast.NodeTransformer):
     def visit_Call(self, node):
         print("\n*********visit call*********")
         if isinstance(node.func, ast.Attribute):
-            print(node.func.attr)
-            if node.func.attr in self.class_and_function_names or node.func.attr in self.imported_modules:
+            if node.func.attr in self.class_and_function_names:
                 node.func.attr = self.mapper[node.func.attr]
-        return self.generic_visit(node)
+            
+            if isinstance(node.func.value, ast.Name) and node.func.value.id in self.class_and_function_names or node.func.value.id in self.global_variables:
+                node.func.value.id = self.mapper[node.func.value.id]
+        
+        if isinstance(node.func, ast.Name):
+            # TODO: self problem
+            if node.func.id in self.class_and_function_names:
+                node.func.id = self.mapper[node.func.id]
+            for arg in node.args:
+                self.visit(arg)
+        return node
 
     def visit_Attribute(self, node):
         print("\n*********visit attribute*********")
@@ -173,6 +193,10 @@ class ObfuscateNames(ast.NodeTransformer):
 def obfuscate_code(file_path):
     with open(file_path, "r") as file:
         tree = ast.parse(file.read())
+
+    with open("dumped_tree.txt", "w") as file:
+        pretty_ast = pprint.pformat(ast.dump(tree, annotate_fields=True, include_attributes=True), indent=4)
+        file.write(pretty_ast)
 
     obfuscator = ObfuscateMasters()
     obfuscated_tree = obfuscator.visit(tree)
