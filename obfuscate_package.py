@@ -1,4 +1,4 @@
-from obfuscate import ObfuscateMasters, ObfuscateNames, ast, astunparse
+from obfuscate import ObfuscateMasters, ObfuscateNames, ast, astunparse, create_mapper
 import os
 import shutil
 
@@ -35,8 +35,9 @@ def get_all_files_in_directory(root_dir, output_dir="obfuscated_files"):
 
 def obfuscate_code(root_dir, ignore_words=[]):
     files = get_all_files_in_directory(root_dir)
-    all_golobals = {}
-    each_file_imports = []
+    class_and_function_names = set()
+    imported_modules = set()
+    global_variables = set()
     each_file_tree = {}
     for file in files:
         if not os.path.isfile(file):
@@ -44,17 +45,23 @@ def obfuscate_code(root_dir, ignore_words=[]):
 
         with open(file, "r") as f:
             tree = ast.parse(f.read())
-        obfuscate_masters = ObfuscateMasters(ignore_words)
+        obfuscate_masters = ObfuscateMasters()
         obfuscate_masters.visit(tree)
-        all_golobals.update(obfuscate_masters.headers_map)
-        each_file_imports.extend(obfuscate_masters.imported_modules)
+        class_and_function_names.update(obfuscate_masters.class_and_function_names)
+        imported_modules.update(obfuscate_masters.imported_modules)
+        global_variables.update(obfuscate_masters.global_variables)
         each_file_tree[file] = tree
+
     os.makedirs("obfuscated_files", exist_ok=True)
+    mapper = create_mapper(class_and_function_names, imported_modules, global_variables)
+    print(mapper)
     for file in files:
+        print("[Start obfuscating]", file)
         if not os.path.isfile(file):
             continue
+
         tree = each_file_tree[file]
-        fully_obfsucated = ObfuscateNames(all_golobals, each_file_imports, ignore_words)
+        fully_obfsucated = ObfuscateNames(class_and_function_names, imported_modules, global_variables, mapper)
         fully_obfsucated.visit(tree)
         ast.fix_missing_locations(tree)
         obfuscated_code = astunparse.unparse(tree)
@@ -63,8 +70,9 @@ def obfuscate_code(root_dir, ignore_words=[]):
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         with open(output_path, "w") as outfile:
             outfile.write(obfuscated_code)
+
         print(f"Obfuscated file written to: {output_path}")
 
-root_dir = "/media/marwan/01DA974290394900/managment_systems"
-ignore_words = ["setupUi", "paintEvent", "cursor"]
+root_dir = "/media/marwan/01DA974290394900/Python_Projects/Qt/QPaint_HowToUse/omar"
+ignore_words = ["setupUi", "paintEvent"]
 obfuscate_code(root_dir, ignore_words)
