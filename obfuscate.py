@@ -148,9 +148,13 @@ class ObfuscateNames(ast.NodeTransformer):
             if node.id in self.class_and_function_names or node.id in self.imported_modules or node.id in self.global_variables:
                 node.id = self.mapper[node.id]
             else:
-                if self.arguments.get(node.id) is None:
+                if node.id not in self.arguments.keys() and node.id not in self.arguments.values():
                     self.arguments[node.id] = random_name()
-                node.id = self.arguments[node.id]
+                    print("[Mapped]", node.id, "->", self.arguments[node.id])
+                    node.id = self.arguments[node.id]
+                
+                elif node.id in self.arguments.keys():
+                    node.id = self.arguments[node.id]
             
         return node
 
@@ -163,14 +167,19 @@ class ObfuscateNames(ast.NodeTransformer):
     def visit_Call(self, node):
         print("\n*********visit call*********")
         if isinstance(node.func, ast.Attribute):
+            self.visit(node.func.value)
+            # if self.arguments.get(node.func.attr) is not None:
+            #     node.func.attr = self.arguments[node.func.attr]
+            # self.visit(node.func)
             #print(node.func.attr in self.args)
-            if node.func.attr in self.class_and_function_names:
-                node.func.attr = self.mapper[node.func.attr]
+            # if node.func.attr in self.class_and_function_names:
+            #     node.func.attr = self.mapper[node.func.attr]
                 
-            #elif node.func.attr in self.arguments:
-            #node.func.attr = self.arguments[node.func.attr]
+            # elif node.func.attr in self.arguments:
+            #     node.func.attr = self.arguments[node.func.attr]
             
             if isinstance(node.func.value, ast.Name):
+                print(node.func.value.id, node.func.value.lineno)
                 if node.func.value.id in self.class_and_function_names or node.func.value.id in self.global_variables:
                     node.func.value.id = self.mapper[node.func.value.id]
                 elif node.func.value.id in self.arguments:
@@ -193,6 +202,7 @@ class ObfuscateNames(ast.NodeTransformer):
                 self.visit(arg)
 
         if isinstance(node.func, ast.Call):
+            print(node.func)
             self.visit(node.func)
 
         return node
@@ -200,9 +210,15 @@ class ObfuscateNames(ast.NodeTransformer):
     def visit_Attribute(self, node):
         print("\n*********visit attribute*********")
         print(node.attr)
-        if self.arguments.get(node.attr) is None and node.attr not in self.imported_modules:
-            self.arguments[node.attr] = random_name()
-        node.attr = self.arguments[node.attr]
+        if isinstance(node.value, ast.Name):
+            print("value.id", node.value.id)
+        #     self.visit(node.value)
+        #     if node.value.id not in self.imported_modules:
+        #         self.arguments[node.attr] = random_name()
+            
+        if self.arguments.get(node.attr) is not None:
+            node.attr = self.arguments[node.attr]
+            # self.arguments[node.attr] = random_name()
         return self.generic_visit(node)
 
     def visit_ImportFrom(self, node):
