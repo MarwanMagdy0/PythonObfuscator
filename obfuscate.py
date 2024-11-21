@@ -8,7 +8,11 @@ import builtins
 random.seed(0)
 
 def random_name(length=10):
-    return ''.join(random.choices(string.ascii_letters, k=length))
+    name = ''.join(random.choices(string.ascii_letters, k=length))
+    if name == "gTcnBEufno":
+        print(name)
+        print("####################################################################################")
+    return name
 
 def create_mapper(class_and_function_names: set, imported_modules: set, global_variables: set):
     mapper = {}
@@ -83,18 +87,12 @@ class ObfuscateNames(ast.NodeTransformer):
         self.arguments = {}
 
     def visit_FunctionDef(self, node):
-        print("\n*********visit function*********")
+        # print("\n*********visit function*********")
         if node.name in self.mapper: # function name
             node.name = self.mapper[node.name]
         
-        for arg in node.args.args:
-            print(arg.arg, "->", arg.lineno)
-            if self.arguments.get(arg.arg) is None:
-                self.arguments[arg.arg] = random_name()
-            arg.arg = self.arguments[arg.arg]
-        
         for arg in node.args.kwonlyargs:
-            print(arg.arg, "->", arg.lineno)
+            # print(arg.arg, "->", arg.lineno)
             if self.arguments.get(arg.arg) is None:
                 self.arguments[arg.arg] = random_name()
             arg.arg = self.arguments[arg.arg]
@@ -110,15 +108,32 @@ class ObfuscateNames(ast.NodeTransformer):
             node.args.kwarg.arg = self.arguments[node.args.kwarg.arg]
         self.generic_visit(node)
         return node
+
+    def visit_arg(self, node):
+        if node.arg in dir(builtins):
+            return node
+        if node.arg in self.class_and_function_names or node.arg in self.imported_modules or node.arg in self.global_variables:
+            print(node.arg, self.mapper[node.arg], node.lineno)
+            node.arg = self.mapper[node.arg]
+        else:
+            if node.arg not in self.arguments.keys() and node.arg not in self.arguments.values():
+                self.arguments[node.arg] = random_name()
+                print("[Mapped]", node.arg, "->", self.arguments[node.arg])
+                node.arg = self.arguments[node.arg]
+            
+            elif node.arg in self.arguments.keys():
+                node.arg = self.arguments[node.arg]
+
+        return node
     
     def visit_Lambda(self, node):
-        for arg in node.args.args:
-            print(arg.arg, "->", arg.lineno)
+        # for arg in node.args.args:
+            # print(arg.arg, "->", arg.lineno)
         self.generic_visit(node)
         return node
     
     def visit_ClassDef(self, node):
-        print("\n*********visit class*********")
+        # print("\n*********visit class*********")
         # Reset class-specific attributes at the beginning of each class
         self.class_attrs = set()
         if node.name in self.mapper:
@@ -140,9 +155,9 @@ class ObfuscateNames(ast.NodeTransformer):
         return node
     
     def visit_Name(self, node):
-        print("\n*********visit Name*********")
+        # print("\n*********visit Name*********")
         if isinstance(node.ctx, (ast.Load, ast.Store)):
-            print(node.id)
+            # print(node.id)
             if node.id in dir(builtins):
                 return node
             if node.id in self.class_and_function_names or node.id in self.imported_modules or node.id in self.global_variables:
@@ -165,65 +180,47 @@ class ObfuscateNames(ast.NodeTransformer):
         return node
 
     def visit_Call(self, node):
-        print("\n*********visit call*********")
+        # print("\n*********visit call*********")
         if isinstance(node.func, ast.Attribute):
-            self.visit(node.func.value)
-            # if self.arguments.get(node.func.attr) is not None:
-            #     node.func.attr = self.arguments[node.func.attr]
-            # self.visit(node.func)
-            #print(node.func.attr in self.args)
-            # if node.func.attr in self.class_and_function_names:
-            #     node.func.attr = self.mapper[node.func.attr]
-                
-            # elif node.func.attr in self.arguments:
-            #     node.func.attr = self.arguments[node.func.attr]
-            
-            if isinstance(node.func.value, ast.Name):
-                print(node.func.value.id, node.func.value.lineno)
-                if node.func.value.id in self.class_and_function_names or node.func.value.id in self.global_variables:
-                    node.func.value.id = self.mapper[node.func.value.id]
-                elif node.func.value.id in self.arguments:
-                    node.func.value.id = self.arguments[node.func.value.id]
-            
-            if isinstance(node.func.value, ast.Call):
-                self.visit(node.func.value)
-            
+            self.visit(node.func)
             for arg in node.args:
                 self.visit(arg)
 
         if isinstance(node.func, ast.Name):
-            print(node.func.id)
-            # TODO: self problem
-            if node.func.id in self.class_and_function_names:
-                node.func.id = self.mapper[node.func.id]
-            elif node.func.id in self.arguments:
-                node.func.id = self.arguments[node.func.id]
+            self.visit(node.func)
             for arg in node.args:
                 self.visit(arg)
 
         if isinstance(node.func, ast.Call):
-            print(node.func)
+            # print(node.func)
             self.visit(node.func)
+        
 
         return node
 
     def visit_Attribute(self, node):
-        print("\n*********visit attribute*********")
-        print(node.attr)
+        # print("\n*********visit attribute*********")
+        # print(node.attr)
+        # print(node.value.id, node.attr)
+        if isinstance(node.value, ast.Attribute):
+            self.visit(node.value)
+        
         if isinstance(node.value, ast.Name):
-            print("value.id", node.value.id)
-        #     self.visit(node.value)
-        #     if node.value.id not in self.imported_modules:
-        #         self.arguments[node.attr] = random_name()
-            
+            self.visit(node.value)
+        
+        if isinstance(node.value, ast.Call):
+            self.visit(node.value)
+
         if self.arguments.get(node.attr) is not None:
             node.attr = self.arguments[node.attr]
-            # self.arguments[node.attr] = random_name()
-        return self.generic_visit(node)
+
+        elif node.attr in self.mapper.keys():
+            node.attr = self.mapper[node.attr]
+        return node
 
     def visit_ImportFrom(self, node):
         for alias in node.names:
-            print(alias.name)
+            # print(alias.name)
             if alias.name in self.class_and_function_names or alias.name in self.global_variables:
                 alias.name = self.mapper[alias.name]
         return node

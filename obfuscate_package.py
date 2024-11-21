@@ -1,4 +1,4 @@
-from obfuscate import ObfuscateMasters, ObfuscateNames, ast, astunparse, create_mapper
+from obfuscate import ObfuscateMasters, ObfuscateNames, ast, astunparse, create_mapper, pprint
 import os
 import shutil
 
@@ -29,7 +29,7 @@ def get_all_files_in_directory(root_dir, output_dir="obfuscated_files"):
                 # Copy non-Python files directly to the output directory
                 print(f"Copying file: {full_file_path}")
                 shutil.copy(full_file_path, os.path.join(output_path, filename))
-
+    all_python_files.sort(key=lambda path: -len(path.split(os.sep)))
     return all_python_files
 
 
@@ -54,7 +54,7 @@ def obfuscate_code(root_dir, ignore_words=[]):
 
     os.makedirs("obfuscated_files", exist_ok=True)
     mapper = create_mapper(class_and_function_names, imported_modules, global_variables)
-    print(mapper)
+    pprint.pprint(mapper)
     for file in files:
         print("[Start obfuscating]", file)
         if not os.path.isfile(file):
@@ -74,5 +74,5 @@ def obfuscate_code(root_dir, ignore_words=[]):
         print(f"Obfuscated file written to: {output_path}")
 
 root_dir = "/media/marwan/01DA974290394900/Python_Projects/Qt/QPaint_HowToUse/omar"
-ignore_words = ["setupUi", "paintEvent"]
+ignore_words = ["paintEvent"]
 obfuscate_code(root_dir, ignore_words)
